@@ -1,0 +1,119 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <title>{{ group.name }}</title>
+</head>
+<body>
+    <h1>{{ group.name }}</h1>
+    <h2>Members</h2>
+    <ul>
+        {% for member in group.members.all %}
+            <li>{{ member.username }}</li>
+        {% endfor %}
+    </ul>
+    <hr>
+    <h2>Currencies</h2>
+    <ul>
+        {% for currency in currencies %}
+            <li>
+                {{ currency.currency }} :
+                1 {{ currency.currency }} = {{ currency.rates }} EUR
+            </li>
+        {% empty %}
+            <li>No currencies registered.</li>
+        {% endfor %}
+    </ul>
+    <hr>
+    <h2>Add a currency</h2>
+    <form action="/groups/{{ group.id }}/currency/" method="get">
+    <p>Currency:<input type="text" name="currency" required></p>
+    <p>Exchange rate (value in EUR):<input type="number" name="rates" step="0.000001" min="0" required></p>
+    <button type="submit">Add currency</button>
+    </form>
+    <hr>
+    <h2>Payments</h2>
+    <ul>
+        {% for payment in payments %}
+            <li>
+                <strong>{{ payment.description }}</strong>
+                <br>
+                Payer: {{ payment.payer.username }}
+                <br>
+                Beneficiaries:
+                {% for beneficiary in payment.beneficiaries.all %}
+                    {{ beneficiary.username }}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+                <br>
+                Amount: {{ payment.amount }} {{ payment.currency.currency }}
+                {% if payment.currency.currency != "EUR" %}
+                ({{ payment.eur_value }} EUR)
+                {% endif %}
+            </li>
+        {% empty %}
+            <li>No payments registered yet.</li>
+        {% endfor %}
+    </ul>
+    <hr>
+    <h2>Current balances</h2>
+    <ul>
+        {% for balance in balances %}
+            <li>
+                {{ balance.user.username }}:
+                {% if balance.amount > 0 %}
+                    Should receive {{ balance.amount|floatformat:2 }} EUR
+                {% elif balance.amount < 0 %}
+                    Owes {{ balance.amount|stringformat:"f"|cut:"-"|floatformat:2 }} EUR
+                {% else %}
+                    Settled (0.00 EUR)
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+    <hr>
+    <h2>Possible clearing</h2>
+    <ul>
+        {% for transaction in clearing %}
+            <li>{{ transaction.debtor.username }} owes {{ transaction.creditor.username }} {{ transaction.amount|floatformat:2 }} EUR </li>
+        {% empty %}
+            <li>Everyone is settled!</li>
+        {% endfor %}
+    </ul>
+    <hr>
+    <h2>Add a payment</h2>
+    <form action="/groups/{{ group.id }}/payment/" method="get">
+        <p>Description:<input type="text" name="description" required></p>
+        <p>Payer:
+            <select name="payer" required>
+                {% for member in group.members.all %}
+                    <option value="{{ member.id }}">
+                        {{ member.username }}
+                    </option>
+                {% endfor %}
+            </select>
+        </p>
+        <p>Beneficiaries:<br>
+            <select name="beneficiaries" multiple required>
+                {% for member in group.members.all %}
+                    <option value="{{ member.id }}">
+                        {{ member.username }}
+                    </option>
+                {% endfor %}
+            </select>
+        </p>
+        <p>Amount:<input type="number" name="amount" step="0.01" min="0.01" required></p>
+        <p>Currency:
+            <select name="currency" required>
+                {% for currency in currencies %}
+                    <option value="{{ currency.id }}">
+                        {{ currency.currency }}
+                    </option>
+                {% endfor %}
+            </select>
+        </p>
+        <button type="submit">Add payment</button>
+    </form>
+    <br>
+    <a href="/groups/">Back to groups</a>
+    <hr><h2>Delete group</h2><a href="/groups/{{ group.id }}/delete/"><button>Delete this group</button></a>
+</body>
+</html>
