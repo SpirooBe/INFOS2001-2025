@@ -1,27 +1,14 @@
-# Expense Sharing Application
+# 2024-2025 INFOS2001 Project implementation
 
-## 1. Project Overview
+## 0. Scope and Limitations
 
-This project is a web application developed with Django that allows users to manage shared expenses within groups.
+All features required by the project statement have been implemented, including the optional ones.
 
-Users can create groups, add members, define group-specific currencies and exchange rates, record expenses, and calculate how much each member owes or should receive. The application also supports reimbursements and a global clearing calculation across multiple groups.
+Some aspects have deliberately been kept simple to focus on the required functionality. In particular, the application does not aim to provide the security, validation, accounting precision or robustness expected from a real production financial application.
 
-The project was developed as part of a university assignment.
+As a cybersecurity major, it would obviously be very easy to implement such security or refinements, but building a perfect web application didn't seem to be the point here.
 
-## 2. Requirements
-
-- Python 3.12 or later
-- Django 4.2.11
-- SQLite (included with Python)
-
-## 3. Installation and Execution
-
-Clone the repository and navigate to the project directory:
-
-```bash
-git clone <repository-url>
-cd <repository-directory>
-```
+## 1. Installation and Execution
 
 Create and activate a virtual environment:
 
@@ -56,15 +43,9 @@ python3 manage.py runserver 9000
 ```
 
 The application is then available at:
+```http://127.0.0.1:9000/```
 
-- **Main application:** http://127.0.0.1:9000/
-- **Django administration:** http://127.0.0.1:9000/admin/
-
-The database is created locally when the migrations are applied. No existing database or preconfigured user accounts are required.
-
-The Django administration interface uses Django's own authentication system, which is separate from the user accounts created through the application's registration page.
-
-## 4. Main Features
+## 2. Main Features
 
 ### User management
 - User registration with a username and password.
@@ -97,17 +78,9 @@ The Django administration interface uses Django's own authentication system, whi
 - Display of the net amount each member should receive or pay.
 - Calculation of a global clearing across all groups.
 
-## 5. Implementation Choices
+## 3. Implementation Choices
 
-### 5.1. Database and framework
-
-The application uses Django and SQLite.
-
-Django provides the framework for handling HTTP requests, rendering templates, interacting with the database and managing sessions. Its Object-Relational Mapper (ORM) allows the application to interact with database records through Python models instead of writing SQL queries directly.
-
-SQLite was selected because it is lightweight, requires no separate database server and is sufficient for the scale of this project.
-
-### 5.2. Data model
+### 3.1. Data model
 
 The application uses five main models: `User`, `Group`, `Currency`, `Payment` and `Share`.
 
@@ -119,7 +92,7 @@ The application uses five main models: `User`, `Group`, `Currency`, `Payment` an
 
 This separation allows the application to distinguish between the original expense, the people who benefit from it and the amount allocated to each person.
 
-### 5.3. Group-specific currencies
+### 3.2. Group-specific currencies
 
 Currencies are associated with groups rather than being defined globally.
 
@@ -129,7 +102,7 @@ All balances are converted into EUR before the clearing calculation. EUR is auto
 
 Exchange rates represent the EUR value of one unit of the corresponding currency.
 
-### 5.4. Expense allocation
+### 3.3. Expense allocation
 
 The `Payment` model stores the original expense, while the `Share` model stores how that expense is distributed among its beneficiaries.
 
@@ -140,7 +113,7 @@ This design supports two allocation methods:
 
 Keeping individual shares in a separate model makes it possible to calculate each member's financial position independently of who initially paid the expense.
 
-### 5.5. Reimbursements
+### 3.4. Reimbursements
 
 Reimbursements are represented using the existing `Payment` model, with the Boolean field `is_reimbursement` distinguishing them from ordinary expenses.
 
@@ -150,7 +123,7 @@ Reimbursements do not create `Share` records and are not included in the total e
 
 This approach avoids introducing a separate model for reimbursements while reusing the existing payment structure.
 
-### 5.6. Clearing algorithm
+### 3.5. Clearing algorithm
 
 The clearing calculation first determines the net balance of each group member.
 
@@ -166,7 +139,7 @@ After converting the amounts into EUR, the application separates members into de
 
 The algorithm uses a straightforward matching approach rather than attempting to find a mathematically optimal solution in every possible case.
 
-### 5.7. Global clearing
+### 3.6. Global clearing
 
 The global clearing feature reuses the same clearing algorithm as the group-level calculation.
 
@@ -174,18 +147,10 @@ Instead of considering payments from a single group, it gathers payments from al
 
 This makes it possible to determine the overall financial position of each user, regardless of which group generated the original expenses.
 
-### 5.8. Sessions
+### 3.7. Sessions
 
 Django sessions are used to keep track of the currently logged-in application user.
 
 The user's database ID is stored in the session after successful login. Subsequent requests use this ID to identify the user and retrieve the relevant information.
 
 Logging out clears the session.
-
-## 6. Scope and Limitations
-
-This application is an educational prototype intended to demonstrate the implementation of a group expense-sharing system.
-
-Some aspects have deliberately been kept simple to focus on the required functionality. In particular, the application does not aim to provide the security, validation, accounting precision or robustness expected from a production financial application.
-
-The authentication system and request-handling approach are simplified for this project and should not be considered production-ready.
