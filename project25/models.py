@@ -29,6 +29,7 @@ class Payment(models.Model):
     description = models.CharField(max_length=200)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     currency = models.ForeignKey(Currency, related_name='payments', on_delete=models.CASCADE)
+    is_reimbursement = models.BooleanField(default=False)
 
     def __str__(self):
         return self.description + " : " + self.group.name

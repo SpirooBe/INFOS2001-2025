@@ -39,11 +39,11 @@
                 <br>
                 Payer: {{ payment.payer.username }}
                 <br>
-                Beneficiaries:
-                {% for beneficiary in payment.beneficiaries.all %}
-                    {{ beneficiary.username }}{% if not forloop.last %}, {% endif %}
+                {% for share in payment.shares.all %}
+                    Beneficiary: {{ share.user.username }}
+                    Amount: {{ share.amount|floatformat:2 }} {{ payment.currency.currency }}
+                    <br>
                 {% endfor %}
-                <br>
                 Amount: {{ payment.amount }} {{ payment.currency.currency }}
                 {% if payment.currency.currency != "EUR" %}
                 ({{ payment.eur_value }} EUR)
@@ -51,6 +51,20 @@
             </li>
         {% empty %}
             <li>No payments registered yet.</li>
+        {% endfor %}
+    </ul>
+    <hr>
+    <h2>Reimbursements</h2>
+    <ul>
+        {% for reimbursement in reimbursements %}
+            <li> {{ reimbursement.payer.username }} reimbursed
+                {% for beneficiary in reimbursement.beneficiaries.all %}
+                    {{ beneficiary.username }}
+                {% endfor %}
+                {{ reimbursement.amount|floatformat:2 }} EUR
+            </li>
+        {% empty %}
+            <li>No reimbursements registered yet.</li>
         {% endfor %}
     </ul>
     <hr>
@@ -81,6 +95,11 @@
             <li>Everyone is settled!</li>
         {% endfor %}
     </ul>
+    {% if clearing %}
+        <form action="/groups/{{ group.id }}/" method="get">
+            <button type="submit" name="confirm_clearing" value="True">Confirm clearing</button>
+        </form>
+    {% endif %}
     <hr>
     <h2>Add a payment</h2>
     <form action="/groups/{{ group.id }}/payment/" method="get">
@@ -103,7 +122,18 @@
                 {% endfor %}
             </select>
         </p>
-        <p>Amount:<input type="number" name="amount" step="0.01" min="0.01" required></p>
+        <label><input type="checkbox" name="custom" value="True" id="custom_checkbox"> Custom split</label>
+        <div id="custom_fields" style="display: none;">
+            <h3>Custom amounts</h3>
+            {% for member in group.members.all %}
+                <label>
+                    {{ member.username }}:
+                    <input type="number" name="share_{{ member.id }}" step="0.01" min="0">
+                </label>
+                <br>
+            {% endfor %}
+        </div>
+        <p id="amount_field">Amount:<input type="number" name="amount" step="0.01" min="0.01" required></p>
         <p>Currency:
             <select name="currency" required>
                 {% for currency in currencies %}
@@ -118,5 +148,25 @@
     <br>
     <a href="/groups/">Back to groups</a>
     <hr><h2>Delete group</h2><a href="/groups/{{ group.id }}/delete/"><button>Delete this group</button></a>
+
+<script>
+    const checkbox = document.getElementById('custom_checkbox')
+    const customFields = document.getElementById('custom_fields')
+    const amountField = document.getElementById('amount_field')
+    const amountInput = document.querySelector('input[name="amount"]')
+    checkbox.addEventListener('change', function() {
+        if (checkbox.checked) {
+            customFields.style.display = 'block';
+            amountField.style.display = 'none';
+            amountInput.required = false;
+            amountInput.disabled = true;
+        } else {
+            customFields.style.display = 'none';
+            amountField.style.display = 'block';
+            amountInput.required = true;
+            amountInput.disabled = false;
+        }
+    });
+</script>
 </body>
 </html>

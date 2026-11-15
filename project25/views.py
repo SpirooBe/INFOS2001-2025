@@ -86,9 +86,13 @@ def detail_view(request, group_id):
     if not group or not group.members.filter(id=user.id).exists():
          return redirect('/groups/')
     members = group.members.all()
-    payments = group.payments.all()
-    balances, clearing = calculate_clearing(members, payments)
-    template_values = {'group' : group, 'currencies' : group.currencies.all(), 'payments' : payments, 'balances': balances.values(), 'clearing': clearing}
+    payments = group.payments.filter(is_reimbursement=False)
+    reimbursements = group.payments.filter(is_reimbursement=True)
+    balances, clearing = calculate_clearing(members, group.payments.all())
+    if 'confirm_clearing' in request.GET:
+        confirm_clearing(group, clearing)
+        return redirect('/groups/' + str(group.id) + '/')
+    template_values = {'group' : group, 'currencies' : group.currencies.all(), 'payments' : payments, 'reimbursements' : reimbursements, 'balances': balances, 'clearing': clearing}
     return render(request, 'detail.html', template_values)
 
 
@@ -135,11 +139,10 @@ def payment_view(request, group_id):
     group = Group.objects.filter(id=group_id).first()
     if not group or not group.members.filter(id=user.id).exists():
         return redirect('/groups/')
-    if ('description' not in request.GET or 'payer' not in request.GET or 'amount' not in request.GET or 'currency' not in request.GET):
+    if ('description' not in request.GET or 'payer' not in request.GET or 'currency' not in request.GET):
         return redirect('/groups/' + str(group.id) + '/')
     description = request.GET['description']
     payer_id = request.GET['payer']
-    amount = Decimal(request.GET['amount'])
     currency_id = request.GET['currency']
     beneficiaries = request.GET.getlist('beneficiaries')
     payer = group.members.filter(id=payer_id).first()
@@ -155,10 +158,32 @@ def payment_view(request, group_id):
             selected_benef.append(beneficiary)
     if not selected_benef:
         return redirect('/groups/' + str(group.id) + '/')
+    custom = 'custom' in request.GET
+    shares = {}
+    if custom:
+        amount = Decimal('0')
+        for beneficiary in selected_benef:
+            name = 'share_' + str(beneficiary.id)
+            if name not in request.GET:
+                return redirect('/groups/' + str(group.id) + '/')
+            share = Decimal(request.GET[name])
+            if share < 0:
+                return redirect('/groups/' + str(group.id) + '/')
+            shares[beneficiary.id] = share
+            amount += share
+    else:
+        if 'amount' not in request.GET:
+            return redirect('/groups/' + str(group.id) + '/')
+        amount = Decimal(request.GET['amount'])
+        if amount <= 0:
+            return redirect('/groups/' + str(group.id) + '/')
     new = Payment.objects.create(group=group, payer=payer, description=description, amount=amount, currency=currency)
-    share = new.amount / len(selected_benef)
     for beneficiary in selected_benef:
         new.beneficiaries.add(beneficiary)
+        if custom:
+            share = shares[beneficiary.id]
+        else:
+            share = new.amount / len(selected_benef)
         Share.objects.create(payment=new, user=beneficiary, amount=share)
     return redirect('/groups/' + str(group.id) + '/')
 
@@ -168,11 +193,16 @@ def calculate_clearing(members, payments):
         balances[member.id] = {'user': member, 'amount': Decimal('0'), 'paid_total': Decimal('0')}
     for payment in payments:
         payment.eur_value = payment.amount * payment.currency.rates
-        balances[payment.payer.id]['paid_total'] += payment.eur_value
-        balances[payment.payer.id]['amount'] += payment.eur_value
-        for share in payment.shares.all():
-            share_eur = share.amount * payment.currency.rates
-            balances[share.user.id]['amount'] -= share_eur
+        if payment.is_reimbursement:
+            beneficiary = payment.beneficiaries.first()
+            balances[payment.payer.id]['amount'] += payment.eur_value
+            balances[beneficiary.id]['amount'] -= payment.eur_value
+        else:
+            balances[payment.payer.id]['paid_total'] += payment.eur_value
+            balances[payment.payer.id]['amount'] += payment.eur_value
+            for share in payment.shares.all():
+                share_eur = share.amount * payment.currency.rates
+                balances[share.user.id]['amount'] -= share_eur
     debtors = []
     creditors = []
     for balance in balances.values():
@@ -214,3 +244,8 @@ def global_clearing_view(request):
     balances, clearing = calculate_clearing(members, payments)
     template_values = {'balances' : balances, 'clearing' : clearing}
     return render(request, 'global_clearing.html', template_values)
+
+def confirm_clearing(group, clearing):
+    for transaction in clearing:
+        reimbursement = Payment.objects.create(group=group, payer=transaction['debtor'], description='Reimbursement', amount=transaction['amount'], currency=group.currencies.get(currency='EUR'), is_reimbursement=True)
+        reimbursement.beneficiaries.add(transaction['creditor'])
