@@ -30,4 +30,5 @@ urlpatterns = [
     path('groups/<int:group_id>/currency/', currency_view),
     path('groups/<int:group_id>/delete/', delete_view),
     path('groups/<int:group_id>/payment/', payment_view),
+    path('global_clearing/', global_clearing_view),
 ]

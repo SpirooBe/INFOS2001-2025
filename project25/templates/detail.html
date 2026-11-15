@@ -59,6 +59,9 @@
         {% for balance in balances %}
             <li>
                 {{ balance.user.username }}:
+                <br> 
+                Total paid: {{ balance.paid_total|floatformat:2 }} EUR
+                <br>
                 {% if balance.amount > 0 %}
                     Should receive {{ balance.amount|floatformat:2 }} EUR
                 {% elif balance.amount < 0 %}

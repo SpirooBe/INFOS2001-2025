@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Global clearing</title>
+</head>
+<body>
+    <h1>Global clearing</h1>
+    <h2>Financial statements</h2>
+    <ul>
+        {% for balance in balances %}
+            <li>
+                <strong>{{ balance.user.username }}</strong>
+                <br> Total expenses paid: {{ balance.paid_total|floatformat:2 }} EUR <br>
+                {% if balance.amount > 0 %}
+                    Should recover:
+                    {{ balance.amount|floatformat:2 }} EUR
+                {% elif balance.amount < 0 %}
+                    Should pay:
+                    {{ balance.amount|stringformat:"f"|cut:"-"|floatformat:2 }} EUR
+                {% else %}
+                    Balance: 0.00 EUR
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+    <h2>Possible global clearing</h2>
+    <ul>
+        {% for transaction in clearing %}
+            <li>{{ transaction.debtor.username }} owes {{ transaction.creditor.username }} {{ transaction.amount|floatformat:2 }} EUR </li>
+        {% empty %}
+            <li>Everyone is settled!</li>
+        {% endfor %}
+    </ul>
+    <a href="/groups/">Back to groups</a>
+</body>
+</html>

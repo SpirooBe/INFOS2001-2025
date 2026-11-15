@@ -87,38 +87,7 @@ def detail_view(request, group_id):
          return redirect('/groups/')
     members = group.members.all()
     payments = group.payments.all()
-    balances = {}
-    for member in members:
-        balances[member.id] = {'user': member, 'amount': Decimal('0')}
-    for payment in payments:
-        payment.eur_value = payment.amount * payment.currency.rates
-        balances[payment.payer.id]['amount'] += payment.eur_value
-        for share in payment.shares.all():
-            share_eur = share.amount * payment.currency.rates
-            balances[share.user.id]['amount'] -= share_eur
-            
-    debtors = []
-    creditors = []
-    for balance in balances.values():
-        amount = balance['amount']
-        if amount < 0:
-            debtors.append({'user': balance['user'], 'amount': -amount})
-        elif amount > 0:
-            creditors.append({'user': balance['user'], 'amount': amount})
-    clearing = []
-    i = 0
-    j = 0
-    while i < len(debtors) and j < len(creditors):
-        debtor = debtors[i]
-        creditor = creditors[j]
-        amount = min(debtor['amount'], creditor['amount'])
-        clearing.append({'debtor': debtor['user'], 'creditor': creditor['user'], 'amount': amount})
-        debtor['amount'] -= amount
-        creditor['amount'] -= amount
-        if debtor['amount'] == 0:
-            i += 1
-        if creditor['amount'] == 0:
-            j += 1
+    balances, clearing = calculate_clearing(members, payments)
     template_values = {'group' : group, 'currencies' : group.currencies.all(), 'payments' : payments, 'balances': balances.values(), 'clearing': clearing}
     return render(request, 'detail.html', template_values)
 
@@ -192,3 +161,56 @@ def payment_view(request, group_id):
         new.beneficiaries.add(beneficiary)
         Share.objects.create(payment=new, user=beneficiary, amount=share)
     return redirect('/groups/' + str(group.id) + '/')
+
+def calculate_clearing(members, payments):
+    balances = {}
+    for member in members:
+        balances[member.id] = {'user': member, 'amount': Decimal('0'), 'paid_total': Decimal('0')}
+    for payment in payments:
+        payment.eur_value = payment.amount * payment.currency.rates
+        balances[payment.payer.id]['paid_total'] += payment.eur_value
+        balances[payment.payer.id]['amount'] += payment.eur_value
+        for share in payment.shares.all():
+            share_eur = share.amount * payment.currency.rates
+            balances[share.user.id]['amount'] -= share_eur
+    debtors = []
+    creditors = []
+    for balance in balances.values():
+        amount = balance['amount']
+        if amount < 0:
+            debtors.append({'user': balance['user'], 'amount': -amount})
+        elif amount > 0:
+            creditors.append({'user': balance['user'], 'amount': amount})
+    clearing = []
+    i = 0
+    j = 0
+    while i < len(debtors) and j < len(creditors):
+        debtor = debtors[i]
+        creditor = creditors[j]
+        amount = min(debtor['amount'], creditor['amount'])
+        clearing.append({'debtor': debtor['user'], 'creditor': creditor['user'], 'amount': amount})
+        debtor['amount'] -= amount
+        creditor['amount'] -= amount
+        if debtor['amount'] == 0:
+            i += 1
+        if creditor['amount'] == 0:
+            j += 1
+    return balances.values(), clearing
+
+def global_clearing_view(request):
+    if 'user_id' not in request.session:
+        return redirect('/login/')
+    user = User.objects.filter(id=request.session['user_id']).first()
+    if not user:
+        request.session.flush()
+        return redirect('/login/')
+    groups = Group.objects.all()
+    # TODO: maybe replace the groups__in
+    members = User.objects.filter(groups__in=groups).distinct()
+    payments = []
+    for group in groups:
+        for payment in group.payments.all():
+            payments.append(payment)
+    balances, clearing = calculate_clearing(members, payments)
+    template_values = {'balances' : balances, 'clearing' : clearing}
+    return render(request, 'global_clearing.html', template_values)
