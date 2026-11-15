@@ -235,8 +235,11 @@ def global_clearing_view(request):
         request.session.flush()
         return redirect('/login/')
     groups = Group.objects.all()
-    # TODO: maybe replace the groups__in
-    members = User.objects.filter(groups__in=groups).distinct()
+    members = []
+    for group in groups:
+        for member in group.members.all():
+            if member not in members:
+                members.append(member)
     payments = []
     for group in groups:
         for payment in group.payments.all():
